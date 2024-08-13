@@ -1,4 +1,3 @@
-import numpy as np
 from math import pi, sin, cos, isclose
 
 def barycentricCoords(A, B, C, P):
@@ -41,17 +40,19 @@ def barycentricCoords(A, B, C, P):
 
 def TranslationMatrix(x, y, z):
 	
-	return np.matrix([[1, 0, 0, x],
-					  [0, 1, 0, y],
-					  [0, 0, 1, z],
-					  [0, 0, 0, 1]])
+	return [
+		[1, 0, 0, x],
+		[0, 1, 0, y],
+		[0, 0, 1, z],
+		[0, 0, 0, 1]
+	]
 
 def ScaleMatrix(x, y, z):
 	
-	return np.matrix([[x, 0, 0, 0],
-					  [0, y, 0, 0],
-					  [0, 0, z, 0],
-					  [0, 0, 0, 1]])
+	return [[x, 0, 0, 0],
+			[0, y, 0, 0],
+			[0, 0, z, 0],
+			[0, 0, 0, 1]]
 
 def RotationMatrix(pitch, yaw, roll):
 	
@@ -61,20 +62,91 @@ def RotationMatrix(pitch, yaw, roll):
 	roll *= pi/180
 	
 	# Creamos la matriz de rotación para cada eje.
-	pitchMat = np.matrix([[1,0,0,0],
-						  [0,cos(pitch),-sin(pitch),0],
-						  [0,sin(pitch),cos(pitch),0],
-						  [0,0,0,1]])
+	pitchMat = [[1,0,0,0],
+			    [0,cos(pitch),-sin(pitch),0],
+			    [0,sin(pitch),cos(pitch),0],
+			    [0,0,0,1]]
 	
-	yawMat = np.matrix([[cos(yaw),0,sin(yaw),0],
-						[0,1,0,0],
-						[-sin(yaw),0,cos(yaw),0],
-						[0,0,0,1]])
+	yawMat = [[cos(yaw),0,sin(yaw),0],
+			  [0,1,0,0],
+			  [-sin(yaw),0,cos(yaw),0],
+			  [0,0,0,1]]
 	
-	rollMat = np.matrix([[cos(roll),-sin(roll),0,0],
-						 [sin(roll),cos(roll),0,0],
-						 [0,0,1,0],
-						 [0,0,0,1]])
-	
-	return pitchMat * yawMat * rollMat
+	rollMat = [[cos(roll),-sin(roll),0,0],
+			   [sin(roll),cos(roll),0,0],
+			   [0,0,1,0],
+			   [0,0,0,1]]
+
+	return matrix_multiply(matrix_multiply(pitchMat, yawMat), rollMat)
+
+
+def matrix_multiply(A, B):
+	# Verificar la compatibilidad de dimensiones
+	if len(A[0]) != len(B):
+		raise ValueError("The number of columns in array A must be equal to the number of rows in array B.")
+
+	# Inicializar la matriz resultado con ceros
+	result = [[0 for _ in range(len(B[0]))] for _ in range(len(A))]
+
+	# Realizar la multiplicación de matrices
+	for i in range(len(A)):  # Filas de A
+		for j in range(len(B[0])):  # Columnas de B
+			for k in range(len(B)):  # Filas de B / Columnas de A
+				result[i][j] += A[i][k] * B[k][j]
+
+	# Devolver la matriz resultado
+	return result
+
+def inversed_matrix(matrix):
+	# Create an identity matrix of the same size as the input matrix
+	n = len(matrix)
+	identity = [[float(i == j) for i in range(n)] for j in range(n)]
+
+	# Create an augmented matrix by appending the identity matrix
+	augmented_matrix = [row[:] + identity_row[:] for row, identity_row in zip(matrix, identity)]
+
+	# Apply Gaussian elimination
+	for i in range(n):
+		# Make the diagonal contain all 1's
+		if augmented_matrix[i][i] == 0:
+			# Find a row with a non-zero element in the current column
+			for j in range(i + 1, n):
+				if augmented_matrix[j][i] != 0:
+					# Swap rows
+					augmented_matrix[i], augmented_matrix[j] = augmented_matrix[j], augmented_matrix[i]
+					break
+			else:
+				# If no non-zero element is found, the matrix is singular
+				return None
+
+		# Normalize the current row
+		factor = augmented_matrix[i][i]
+		for k in range(2 * n):
+			augmented_matrix[i][k] /= factor
+
+		# Make all rows except the current row have a 0 in the current column
+		for j in range(n):
+			if i != j:
+				factor = augmented_matrix[j][i]
+				for k in range(2 * n):
+					augmented_matrix[j][k] -= factor * augmented_matrix[i][k]
+
+	# Extract the inverse matrix from the augmented matrix
+	inverse_matrix = [row[n:] for row in augmented_matrix]
+	return inverse_matrix
+
+
+def vector_matrix_multiply(vector, matrix):
+	# Check if the multiplication is possible
+	if len(vector) != len(matrix):
+		raise ValueError("The vector and matrix dimensions do not align for multiplication.")
+
+	# Multiply the vector by the matrix
+	result_vector = []
+	for i in range(len(matrix[0])):  # Assuming matrix is well-formed (rectangular)
+		result_vector.append(sum(vector[j] * matrix[j][i] for j in range(len(vector))))
+
+	return result_vector
+
+
 	
