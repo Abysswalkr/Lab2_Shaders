@@ -6,14 +6,24 @@ from texture import Texture
 class Model(object):
 	def __init__(self, filename):
 		objFile = Obj(filename)
-		
+
 		self.vertices = objFile.vertices
 		self.faces = objFile.faces
-		
-		self.translate = [0,0,0]
-		self.rotate = [0,0,0]
-		self.scale = [1,1,1]
+		self.textCoords = objFile.texcoords  # new one
+		self.normals = objFile.normals
 
+		self.translate = [0, 0, 0]
+		self.rotate = [0, 0, 0]
+		self.scale = [1, 1, 1]
+
+		self.texCoords = objFile.texcoords
+		self.texture = None
+
+		self.vertexShader = None
+		self.fragmentShader = None
+
+	def loadTexture(self, filename):
+		self.texture = Texture(filename)
 
 	def GetModelMatrix(self):
 		translateMat = TranslationMatrix(self.translate[0],
