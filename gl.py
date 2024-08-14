@@ -1,6 +1,5 @@
 import struct
 from camera import Camera
-import numpy as np
 from math import tan, pi, isclose
 from MathLib import barycentricCoords
 
@@ -24,23 +23,27 @@ TRIANGLES = 2
 
 class Renderer(object):
 	def __init__(self, screen):
-		
+
 		self.screen = screen
 		_, _, self.width, self.height = screen.get_rect()
-		
+
 		self.camera = Camera()
-		self.glViewport(0,0, self.width, self.height)
+		self.glViewport(0, 0, self.width, self.height)
 		self.glProjection()
-		
-		self.glColor(1,1,1)
-		self.glClearColor(0,0,0)
+
+		self.glColor(1, 1, 1)
+		self.glClearColor(0, 0, 0)
 		self.glClear()
-		
-		self.vertexShader = None
-		self.fragmentShader = None
-		
-		self.primitiveType = TRIANGLES
-		
+
+		self.activeVertexShader = None
+		self.activeFragmentShader = None
+
+		self.activeTexture = None
+
+		self.directionalLight = [1, 0, 0]
+
+		self.primitiveType = POINTS
+
 		self.models = []
 
 
@@ -50,10 +53,10 @@ class Renderer(object):
 		self.vpWidth = width
 		self.vpHeight = height
 		
-		self.viewportMatrix = np.matrix([[width/2,0,0,x + width/2],
+		self.viewportMatrix = [[width/2,0,0,x + width/2],
 										 [0,height/2,0,y + height/2],
 										 [0,0,0.5,0.5],
-										 [0,0,0,1]])
+										 [0,0,0,1]]
 		
 
 	def glProjection(self, n = 0.1, f = 1000, fov = 60):
@@ -63,10 +66,10 @@ class Renderer(object):
 		t = tan(fov / 2) * n
 		r = t * aspectRatio
 		
-		self.projectionMatrix = np.matrix([[n/r, 0, 0, 0],
+		self.projectionMatrix = [[n/r, 0, 0, 0],
 										   [0, n/t, 0, 0],
 										   [0, 0, -(f+n)/(f-n), -(2*f*n)/(f-n)],
-										   [0, 0, -1, 0]])
+										   [0, 0, -1, 0]]
 		
 
 	def glColor(self, r, g, b):
@@ -203,6 +206,9 @@ class Renderer(object):
 			# Por cada modelo en la lista, los dibujo
 			# Agarrar su matriz modelo
 			mMat = model.GetModelMatrix()
+			self.activeVertexShader = model.vertexShader
+			self.activeFragmentShader = model.fragmentShader
+			self.activeTexture = model.texture
 			
 			# Aqui vamos a guardar todos los vertices y su info correspondiente
 			vertexBuffer = [ ]
@@ -225,15 +231,22 @@ class Renderer(object):
 					# Si contamos con un Vertex Shader, se manda cada vertice
 					# para transformalos. Recordar pasar las matrices necesarias
 					# para usarlas dentro del shader
-					if self.vertexShader:
-						pos = self.vertexShader(pos,
-												modelMatrix = mMat,
-												viewMatrix = self.camera.GetViewMatrix(),
-												projectionMatrix = self.projectionMatrix,
-												viewportMatrix = self.viewportMatrix)
-						 
+					if self.activeVertexShader:
+						pos = self.activeVertexShader(pos,
+													  modelMatrix=mMat,
+													  viewMatrix=self.camera.GetViewMatrix(),
+													  projectionMatrix=self.projectionMatrix,
+													  viewportMatrix=self.viewportMatrix,
+													  )
+
 					# Agregamos los valores de posicion al contenedor del vertice
 					for value in pos:
+						vert.append(value)
+					vts = model.texCoords[face[i][1] - 1]
+					for value in vts:
+						vert.append(value)
+					normal = model.normals[face[i][2] - 1]
+					for values in normal:
 						vert.append(value)
 						
 					# Agregamos la informacion de este vertices a la
@@ -327,9 +340,27 @@ class Renderer(object):
 			# Teorema del intercepto para calcular D en X y Y
 			D = [ A[0] + ((B[1] - A[1]) / (C[1] - A[1])) * (C[0] - A[0]), B[1]]
 
+			u, v, w = barycentricCoords(A, B, C, D)
+			for i in range(2, len(A)):
+				#P = uA + vB + wC
+				D.append( u*A[i] + v * B[i] + w * C[i])
+
 			flatBottom(A, B, D)
 			flatTop(B, D, C)
 
+	def glTriangle_ee(self, A, B, C):
+
+		# Bounding Box
+		minX = round(min(A[0], B[0], C[0]))
+		minY = round(min(A[1], B[1], C[1]))
+		maxX = round(max(A[0], B[0], C[0]))
+		maxY = round(max(A[1], B[1], C[1]))
+
+		for x in range(minX, maxX + 1):
+			for y in range(minY, maxY + 1):
+				P = [x,y]
+				if barycentricCoords(A, B, C, P) != None:
+					self.glDrawTrianglePoint(A,B,C,P)
 
 	def glDrawTrianglePoint(self, A, B, C, P):
 		
@@ -349,17 +380,28 @@ class Renderer(object):
 		
 		u, v, w = bCoords
 
-		# Si contamos un Fragment Shader, obtener el color de ahí
+
+		if not isclose(u + v + w, 1.0):
+			return
+
+		z = u * A[2] + v * B[2] + w * C[2]
+
+		if z >= self.zbuffer[x][y]:
+			return
+
+		self.zbuffer[x][y] = z
+
+		# Si contamos un Fragment Shader, obtener el color de ah?
 		color = self.currColor
-		
-		if self.fragmentShader != None:
-			# Mandar los parámetros necesarios al shader
+
+		if self.activeFragmentShader != None:
 			verts = (A, B, C)
-			color = self.fragmentShader(verts = verts,
-										bCoords = bCoords,)
+			color = self.activeFragmentShader(verts = verts,
+										bCoords = bCoords,
+										texture = self.activeTexture,
+										dirLight = self.directionalLight)
 
 		self.glPoint(x, y, color)
-
 
 	def glDrawPrimitives(self, buffer, vertexOffset):
 		# El buffer es un listado de valores que representan
@@ -412,7 +454,7 @@ class Renderer(object):
 				B = [ buffer[i + j + vertexOffset * 1] for j in range(vertexOffset)]
 				C = [ buffer[i + j + vertexOffset * 2] for j in range(vertexOffset)]
 				
-				self.glTriangle(A, B, C)
+				self.glTriangle_ee(A, B, C)
 				
 				
 

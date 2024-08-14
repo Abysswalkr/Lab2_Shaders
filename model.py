@@ -36,6 +36,6 @@ class Model(object):
 		
 		scaleMat = ScaleMatrix(self.scale[0],
 							   self.scale[1],
-							   self.scale[2]) 
-		
-		return translateMat * rotateMat * scaleMat
+							   self.scale[2])
+
+		return matrix_multiply(matrix_multiply(translateMat, rotateMat), scaleMat)
