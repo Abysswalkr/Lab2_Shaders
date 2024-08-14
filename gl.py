@@ -198,75 +198,61 @@ class Renderer(object):
 								   color[0]])
 					
 					file.write(color)
-			
-					
+
 	def glRender(self):
-		
 		for model in self.models:
-			# Por cada modelo en la lista, los dibujo
-			# Agarrar su matriz modelo
 			mMat = model.GetModelMatrix()
 			self.activeVertexShader = model.vertexShader
 			self.activeFragmentShader = model.fragmentShader
 			self.activeTexture = model.texture
-			
-			# Aqui vamos a guardar todos los vertices y su info correspondiente
-			vertexBuffer = [ ]
-			
-			# Para cada cara del modelo, recorremos la info de vértices de esa cara
+
+			vertexBuffer = []
+
 			for face in model.faces:
-				
-				# Aqui vamos a guardar los vertices de esta cara
 				faceVerts = []
 
 				for i in range(len(face)):
-					
-					# Aqui vamos a guardar los valores individuales de 
-					# posicion, coordenadas de textura y normales
 					vert = []
-					
-					# Obtenemos los vertices de la cara actual
-					pos = model.vertices[ face[i][0] - 1 ]
-					
-					# Si contamos con un Vertex Shader, se manda cada vertice
-					# para transformalos. Recordar pasar las matrices necesarias
-					# para usarlas dentro del shader
+					pos = model.vertices[face[i][0] - 1]
+
 					if self.activeVertexShader:
-						pos = self.activeVertexShader(pos,
-													  modelMatrix=mMat,
-													  viewMatrix=self.camera.GetViewMatrix(),
-													  projectionMatrix=self.projectionMatrix,
-													  viewportMatrix=self.viewportMatrix,
-													  )
+						# Only call the vertex shader if necessary and ensure it runs efficiently
+						pos = self.activeVertexShader(
+							pos,
+							modelMatrix=mMat,
+							viewMatrix=self.camera.GetViewMatrix(),
+							projectionMatrix=self.projectionMatrix,
+							viewportMatrix=self.viewportMatrix,
+						)
 
-					# Agregamos los valores de posicion al contenedor del vertice
-					for value in pos:
-						vert.append(value)
-					vts = model.texCoords[face[i][1] - 1]
-					for value in vts:
-						vert.append(value)
-					normal = model.normals[face[i][2] - 1]
-					for values in normal:
-						vert.append(value)
-						
-					# Agregamos la informacion de este vertices a la
-					# lista de vertices de esta cara
+					vert.extend(pos)
+
+					texCoordIndex = face[i][1]
+					if texCoordIndex is not None:
+						vts = model.texcoords[texCoordIndex - 1]
+					else:
+						vts = [0, 0]
+
+					vert.extend(vts)
+
+					normalIndex = face[i][2]
+					if normalIndex is not None:
+						normal = model.normals[normalIndex - 1]
+					else:
+						normal = [0, 0, 0]
+
+					vert.extend(normal)
 					faceVerts.append(vert)
-					
-				# Agregamos toda la informacion de los tres vertices de
-				# esta cara de corrido al buffer de vertices. Si hay
-				# cuatro vertices, creamos un segundo triangulo
-				for value in faceVerts[0]: vertexBuffer.append(value)
-				for value in faceVerts[1]: vertexBuffer.append(value)
-				for value in faceVerts[2]: vertexBuffer.append(value)
-				if len(faceVerts) == 4:
-					for value in faceVerts[0]: vertexBuffer.append(value)
-					for value in faceVerts[2]: vertexBuffer.append(value)
-					for value in faceVerts[3]: vertexBuffer.append(value)
 
-			# Mandamos el buffer de vertices de este modelo a ser dibujado
-			self.glDrawPrimitives(vertexBuffer, 3)
-				
+				vertexBuffer.extend(faceVerts[0])
+				vertexBuffer.extend(faceVerts[1])
+				vertexBuffer.extend(faceVerts[2])
+				if len(faceVerts) == 4:
+					vertexBuffer.extend(faceVerts[0])
+					vertexBuffer.extend(faceVerts[2])
+					vertexBuffer.extend(faceVerts[3])
+
+			self.glDrawPrimitives(vertexBuffer, 8)
 
 	def glTriangle(self, A, B, C):
 		

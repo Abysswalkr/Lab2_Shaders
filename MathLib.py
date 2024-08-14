@@ -85,18 +85,19 @@ def RotationMatrix(pitch, yaw, roll):
 
 
 def matrix_multiply(A, B):
-
     if len(A[0]) != len(B):
-        raise ValueError("The number of columns in the first array must be equal to the number of rows in the second array.")
+        raise ValueError(
+            "Number of columns in the first matrix must be equal to the number of rows in the second matrix.")
 
-    # Inicializar la matriz resultado
-    result = [[0 for _ in range(len(B[0]))] for _ in range(len(A))]
+    # Initialize the result matrix with zeros
+    result = [[0] * len(B[0]) for _ in range(len(A))]
 
-    # Multiplicar las matrices
+    # Perform matrix multiplication with optimized loops
     for i in range(len(A)):
-        for j in range(len(B[0])):
-            for k in range(len(B)):
-                result[i][j] += A[i][k] * B[k][j]
+        for k in range(len(B)):  # Iterate over columns of A (or rows of B)
+            if A[i][k] != 0:  # Only proceed if the element is non-zero
+                for j in range(len(B[0])):
+                    result[i][j] += A[i][k] * B[k][j]
 
     return result
 
