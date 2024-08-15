@@ -80,3 +80,49 @@ def flatShader(**kwargs):
     ]
 
     return color
+
+def stripedShader(**kwargs):
+
+    A, B, C = kwargs["verts"]
+    u, v, w = kwargs["bCoords"]
+
+    # Interpolate the Y-coordinate
+    y = u * A[1] + v * B[1] + w * C[1]
+
+    # Use a sinusoidal function to create stripes
+    frequency = 20.0
+    stripes = math.sin(y * frequency)
+
+    # Map the stripes to a color pattern
+    if stripes > 0:
+        color = [1, 0, 0]  # Red
+    else:
+        color = [0, 1, 0]  # Green
+
+    return color
+
+
+def toonShader(**kwargs):
+    A, B, C = kwargs["verts"]
+    u, v, w = kwargs["bCoords"]
+    dirLight = kwargs["dirLight"]
+
+    normal = [
+        u * A[5] + v * B[5] + w * C[5],
+        u * A[6] + v * B[6] + w * C[6],
+        u * A[7] + v * B[7] + w * C[7]
+    ]
+
+    norm = (normal[0]**2 + normal[1]**2 + normal[2]**2) ** 0.5
+    normal = [normal[i] / norm for i in range(3)]
+
+    intensity = max(0, sum([normal[i] * dirLight[i] for i in range(3)]))
+
+    if intensity > 0.95:
+        color = [1, 1, 1]  # Bright color
+    elif intensity > 0.5:
+        color = [0.6, 0.6, 0.6]  # Mid-tone color
+    else:
+        color = [0.3, 0.3, 0.3]  # Dark tone color
+
+    return color
